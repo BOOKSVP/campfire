@@ -150,17 +150,21 @@ window.openSettings = function openSettings() {
   const panel = document.getElementById('settings-panel');
   const grid = document.getElementById('team-grid');
   const updateBar = document.getElementById('update-bar');
+  const footer = document.querySelector('footer');
   panel.classList.remove('hidden');
   grid.classList.add('hidden');
   updateBar.classList.add('hidden');
+  if (footer) footer.classList.add('hidden');
   renderSettings();
 }
 
 window.closeSettings = function closeSettings() {
   const panel = document.getElementById('settings-panel');
   const grid = document.getElementById('team-grid');
+  const footer = document.querySelector('footer');
   panel.classList.add('hidden');
   grid.classList.remove('hidden');
+  if (footer) footer.classList.remove('hidden');
 }
 
 function updatePostButton() {
