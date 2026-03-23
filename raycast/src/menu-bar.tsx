@@ -1,15 +1,16 @@
-import { MenuBarExtra, LaunchType, launchCommand, Icon, Image, showToast, Toast, LocalStorage } from "@raycast/api";
+import { MenuBarExtra, LaunchType, launchCommand, Icon, Image, showToast, Toast, LocalStorage, environment } from "@raycast/api";
 import { useCachedPromise } from "@raycast/utils";
 import { fetchUsersWithStatuses } from "./api";
 import { UserWithStatus } from "./types";
 import { timeAgo } from "./utils";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const LAST_SEEN_KEY = "campfire_last_seen_ts";
 
 export default function MenuBar() {
   const [hasNew, setHasNew] = useState(false);
   const [lastSeenTs, setLastSeenTs] = useState<number>(0);
+  const hasMarkedSeen = useRef(false);
 
   const { data, isLoading, revalidate } = useCachedPromise(fetchUsersWithStatuses, [], {
     keepPreviousData: true,
@@ -22,35 +23,31 @@ export default function MenuBar() {
     });
   }, []);
 
-  // Check if any status is newer than last seen
+  // Check for new statuses (background refresh)
   useEffect(() => {
-    if (!data || !lastSeenTs) {
-      // If never seen before, check if there are any statuses at all
-      if (data && data.some((d: UserWithStatus) => d.latestStatus)) {
-        setHasNew(true);
-      }
-      return;
-    }
+    if (!data) return;
 
-    const hasNewStatus = data.some((d: UserWithStatus) => {
-      if (!d.latestStatus) return false;
-      const statusTs = new Date(d.latestStatus.created_at).getTime();
-      return statusTs > lastSeenTs;
-    });
+    const newestTs = Math.max(
+      ...data.map((d: UserWithStatus) =>
+        d.latestStatus ? new Date(d.latestStatus.created_at).getTime() : 0
+      )
+    );
 
-    setHasNew(hasNewStatus);
+    setHasNew(lastSeenTs > 0 ? newestTs > lastSeenTs : newestTs > 0);
   }, [data, lastSeenTs]);
 
-  // When menu is opened, mark as seen
-  async function markSeen() {
-    const now = Date.now();
-    await LocalStorage.setItem(LAST_SEEN_KEY, String(now));
-    setLastSeenTs(now);
-    setHasNew(false);
-  }
+  // When launched by user (dropdown opened), mark as seen
+  useEffect(() => {
+    if (environment.launchType === LaunchType.UserInitiated && !hasMarkedSeen.current && data) {
+      hasMarkedSeen.current = true;
+      const now = Date.now();
+      LocalStorage.setItem(LAST_SEEN_KEY, String(now));
+      setLastSeenTs(now);
+      setHasNew(false);
+    }
+  }, [data]);
 
   async function openTeamStatus() {
-    await markSeen();
     try {
       await launchCommand({ name: "team-status", type: LaunchType.UserInitiated });
     } catch {
@@ -59,7 +56,6 @@ export default function MenuBar() {
   }
 
   async function openPostStatus() {
-    await markSeen();
     try {
       await launchCommand({ name: "post-status", type: LaunchType.UserInitiated });
     } catch {
@@ -79,8 +75,6 @@ export default function MenuBar() {
         const name = user.username;
         const statusText = latestStatus?.status ?? "No status";
         const subtitle = latestStatus ? timeAgo(latestStatus.created_at) : undefined;
-        const isNew = latestStatus && lastSeenTs > 0 &&
-          new Date(latestStatus.created_at).getTime() > lastSeenTs;
 
         const icon: Image.ImageLike | undefined = user.profile_pic_url
           ? { source: user.profile_pic_url, mask: Image.Mask.Circle }
@@ -89,10 +83,10 @@ export default function MenuBar() {
         return (
           <MenuBarExtra.Item
             key={user.id}
-            title={`${isNew ? "● " : ""}${name}: ${statusText}`}
+            title={`${name}: ${statusText}`}
             subtitle={subtitle}
             icon={icon}
-            onAction={() => { markSeen(); openTeamStatus(); }}
+            onAction={openTeamStatus}
           />
         );
       })}
@@ -109,7 +103,7 @@ export default function MenuBar() {
       <MenuBarExtra.Item
         title="Refresh"
         icon={Icon.ArrowClockwise}
-        onAction={() => { markSeen(); revalidate(); }}
+        onAction={revalidate}
         shortcut={{ modifiers: ["cmd"], key: "r" }}
       />
     </MenuBarExtra>
