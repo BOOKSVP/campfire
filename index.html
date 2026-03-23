@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campfire — Team Status</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🔥 Campfire</h1>
+      <p class="subtitle">What's everyone working on?</p>
+    </header>
+
+    <div id="team-grid" class="team-grid">
+      <div class="loading">Loading...</div>
+    </div>
+
+    <div id="update-bar" class="update-bar hidden">
+      <select id="user-select"></select>
+      <input type="text" id="status-input" placeholder="What are you working on?" maxlength="280">
+      <select id="expires-select">
+        <option value="">No expiry</option>
+        <option value="30">30 min</option>
+        <option value="60">1 hour</option>
+        <option value="120">2 hours</option>
+        <option value="240">4 hours</option>
+        <option value="480">End of day</option>
+      </select>
+      <button id="post-btn">Post</button>
+    </div>
+
+    <footer>
+      <button id="toggle-update" class="text-btn">Post an update</button>
+      <span class="sep">·</span>
+      <span id="last-refresh" class="meta"></span>
+    </footer>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
