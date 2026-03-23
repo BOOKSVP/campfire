@@ -38,13 +38,21 @@ async function loadUsers() {
   console.log(`[campfire] Loaded ${Object.keys(users).length} users`);
 }
 
+const ICON_PATH = join(process.env.HOME, '.campfire-raycast', 'notifier', 'icon.png');
+
 function notify(title, message) {
-  const escaped = message.replace(/"/g, '\\"');
+  const escaped = message.replace(/"/g, '\\"').replace(/'/g, "'");
   const titleEscaped = title.replace(/"/g, '\\"');
   try {
-    execSync(`osascript -e 'display notification "${escaped}" with title "${titleEscaped}" sound name "Blow"'`);
+    // Try terminal-notifier first (custom icon + sound)
+    execSync(`terminal-notifier -title "${titleEscaped}" -message "${escaped}" -appIcon "${ICON_PATH}" -sound default -group campfire 2>/dev/null`);
   } catch {
-    console.error('[campfire] Failed to send notification');
+    // Fallback to osascript
+    try {
+      execSync(`osascript -e 'display notification "${escaped}" with title "${titleEscaped}"'`);
+    } catch {
+      console.error('[campfire] Failed to send notification');
+    }
   }
 }
 

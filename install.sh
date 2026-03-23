@@ -54,6 +54,17 @@ echo -e "${CYAN}🔔 Setting up background notifier...${NC}"
 cd "$INSTALL_DIR/notifier"
 npm install --silent 2>/dev/null
 
+# Install terminal-notifier if not present
+if ! command -v terminal-notifier &> /dev/null; then
+  echo -e "${CYAN}📦 Installing terminal-notifier...${NC}"
+  if command -v brew &> /dev/null; then
+    brew install terminal-notifier 2>/dev/null
+  else
+    echo -e "${YELLOW}⚠️  Install Homebrew (brew.sh) then run: brew install terminal-notifier${NC}"
+    echo "   Notifications will use fallback until installed."
+  fi
+fi
+
 # ── Step 4: Set up Launch Agent ──
 
 # Stop existing agent if running
