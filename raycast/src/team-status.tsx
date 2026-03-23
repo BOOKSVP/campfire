@@ -52,7 +52,7 @@ export default function TeamStatus() {
   return (
     <List isLoading={isLoading} navigationTitle="Team Status">
       {(data ?? []).map(({ user, latestStatus }: UserWithStatus) => {
-        const name = user.display_name || user.username;
+        const name = user.username;
         const statusText = latestStatus?.status ?? "No status";
 
         const icon: Image.ImageLike = user.profile_pic_url

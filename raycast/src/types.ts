@@ -1,7 +1,6 @@
 export interface TeamUser {
   id: number;
   username: string;
-  display_name: string | null;
   profile_pic_url: string | null;
   team_id: number;
 }

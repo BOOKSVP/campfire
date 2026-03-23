@@ -33,7 +33,7 @@ export default function MenuBar() {
       isLoading={isLoading}
     >
       {(data ?? []).map(({ user, latestStatus }: UserWithStatus) => {
-        const name = user.display_name || user.username;
+        const name = user.username;
         const statusText = latestStatus?.status ?? "No status";
         const subtitle = latestStatus ? timeAgo(latestStatus.created_at) : undefined;
 

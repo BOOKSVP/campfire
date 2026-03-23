@@ -62,7 +62,7 @@ export default function PostStatus() {
     >
       <Form.Dropdown id="userId" title="Team Member" defaultValue={defaultUserId}>
         {(users ?? []).map((user: TeamUser) => {
-          const name = user.display_name || user.username;
+          const name = user.username;
           const icon: Image.ImageLike = user.profile_pic_url
             ? { source: user.profile_pic_url, mask: Image.Mask.Circle }
             : Icon.Person;
