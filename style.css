@@ -294,25 +294,32 @@ footer {
   flex: 1;
 }
 
-.history-close {
+.history-back {
   background: none;
-  border: none;
+  border: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 16px;
+  font-family: inherit;
+  font-size: 12px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.15s;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
 }
 
-.history-close:hover {
+.history-back:hover {
   background: var(--border);
   color: var(--text);
 }
 
+.history-view {
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
 .history-list {
   padding: 8px 0;
-  max-height: 320px;
+  max-height: 400px;
   overflow-y: auto;
 }
 

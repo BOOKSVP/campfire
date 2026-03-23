@@ -116,35 +116,18 @@ window.showHistory = async function showHistory(userId) {
   const user = currentUsers.find(u => u.id === userId);
   if (!user) return;
 
-  // Close if already open for this user
-  const existing = document.getElementById('history-panel');
-  if (existing && existing.dataset.userId == userId) {
-    existing.remove();
-    return;
-  }
-  if (existing) existing.remove();
-
+  const grid = document.getElementById('team-grid');
   const history = await fetchUserHistory(userId);
-
-  const panel = document.createElement('div');
-  panel.id = 'history-panel';
-  panel.dataset.userId = userId;
 
   const avatarInner = user.profile_pic_url
     ? `<img src="${user.profile_pic_url}" alt="${user.username}">`
     : getInitials(user.username);
 
+  // Group by day
+  let historyHtml = '';
   if (!history.length) {
-    panel.innerHTML = `
-      <div class="history-header">
-        <div class="history-avatar avatar">${avatarInner}</div>
-        <div class="history-title">${user.username}</div>
-        <button class="history-close" onclick="this.closest('#history-panel').remove()">✕</button>
-      </div>
-      <div class="history-empty">No status history yet</div>
-    `;
+    historyHtml = '<div class="history-empty">No status history yet</div>';
   } else {
-    // Group by day
     const days = {};
     for (const s of history) {
       const dayKey = new Date(s.created_at).toDateString();
@@ -152,7 +135,6 @@ window.showHistory = async function showHistory(userId) {
       days[dayKey].push(s);
     }
 
-    let historyHtml = '';
     for (const [dayKey, entries] of Object.entries(days)) {
       const d = new Date(dayKey);
       const now = new Date();
@@ -177,20 +159,26 @@ window.showHistory = async function showHistory(userId) {
         `;
       }
     }
-
-    panel.innerHTML = `
-      <div class="history-header">
-        <div class="history-avatar avatar">${avatarInner}</div>
-        <div class="history-title">${user.username}</div>
-        <button class="history-close" onclick="this.closest('#history-panel').remove()">✕</button>
-      </div>
-      <div class="history-list">${historyHtml}</div>
-    `;
   }
 
-  // Insert after the team grid
+  // Replace the grid with the history view
+  grid.innerHTML = `
+    <div class="history-view">
+      <div class="history-header">
+        <button class="history-back" onclick="window.closeHistory()">← Back</button>
+        <div class="history-avatar avatar">${avatarInner}</div>
+        <div class="history-title">${user.username}</div>
+      </div>
+      <div class="history-list">${historyHtml}</div>
+    </div>
+  `;
+  grid.dataset.historyMode = 'true';
+}
+
+window.closeHistory = function closeHistory() {
   const grid = document.getElementById('team-grid');
-  grid.after(panel);
+  delete grid.dataset.historyMode;
+  refresh();
 }
 
 // ── Render ──
