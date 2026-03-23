@@ -395,72 +395,45 @@ function init() {
     }, { once: true });
   }
 
-  // Subscribe to Supabase Realtime for live updates
+  // Subscribe to Supabase Realtime for live updates + notifications
   setupRealtime();
 }
 
 function setupRealtime() {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  if (!SUPABASE_URL || !SUPABASE_KEY || !window.supabase) return;
 
-  const ws = new WebSocket(
-    `${SUPABASE_URL.replace('https://', 'wss://')}/realtime/v1/websocket?apikey=${SUPABASE_KEY}&vsn=1.0.0`
-  );
+  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  ws.onopen = () => {
-    // Join the realtime channel for status_updates
-    const joinMsg = JSON.stringify({
-      topic: `realtime:public:status_updates`,
-      event: 'phx_join',
-      payload: { config: { postgres_changes: [{ event: 'INSERT', schema: 'public', table: 'status_updates', filter: `team_id=eq.${TEAM_ID}` }] } },
-      ref: '1'
-    });
-    ws.send(joinMsg);
+  client
+    .channel('campfire-statuses')
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'status_updates', filter: `team_id=eq.${TEAM_ID}` },
+      (payload) => {
+        const record = payload.new;
+        const userId = record.team_user_id;
+        const status = record.status;
+        const user = currentUsers.find(u => u.id === userId);
+        const name = user?.username || 'Someone';
 
-    // Heartbeat every 30s to keep connection alive
-    setInterval(() => {
-      ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: 'hb' }));
-    }, 30000);
-  };
+        // Refresh the UI instantly
+        refresh();
 
-  ws.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
-      if (msg.event === 'postgres_changes' || msg.event === 'INSERT') {
-        const payload = msg.payload;
-        if (payload?.data?.record || payload?.record) {
-          const record = payload.data?.record || payload.record;
-          const userId = record.team_user_id;
-          const status = record.status;
-          const user = currentUsers.find(u => u.id === userId);
-          const name = user?.username || 'Someone';
-
-          // Refresh the UI
-          refresh();
-
-          // Send browser notification (if not from current user)
-          const myId = getIdentity();
-          if ('Notification' in window && Notification.permission === 'granted' && String(userId) !== myId) {
+        // Send browser notification
+        const myId = getIdentity();
+        if ('Notification' in window && Notification.permission === 'granted') {
+          if (String(userId) !== String(myId)) {
             new Notification(`🔥 ${name}`, {
               body: status,
               icon: user?.profile_pic_url || undefined,
-              tag: 'campfire-status'
+              tag: `campfire-${userId}`
             });
           }
         }
       }
-    } catch (e) {
-      // ignore parse errors
-    }
-  };
-
-  ws.onclose = () => {
-    // Reconnect after 5s
-    setTimeout(setupRealtime, 5000);
-  };
-
-  ws.onerror = () => {
-    ws.close();
-  };
+    )
+    .subscribe((status) => {
+      console.log('[campfire] Realtime:', status);
+    });
 }
 
 document.addEventListener('DOMContentLoaded', init);
