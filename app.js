@@ -207,7 +207,7 @@ function renderTeam(users, statuses) {
       : getInitials(u.username);
 
     return `
-      <div class="user-card" onclick="showHistory(${u.id})" style="cursor:pointer">
+      <div class="user-card" data-user-id="${u.id}" style="cursor:pointer">
         <div class="avatar">${avatarInner}</div>
         <div class="user-info">
           <div class="user-name">${u.username}</div>
@@ -252,6 +252,14 @@ function init() {
 
   refresh();
   setInterval(refresh, REFRESH_INTERVAL);
+
+  // Click on user card → show history
+  document.getElementById('team-grid').addEventListener('click', (e) => {
+    const card = e.target.closest('.user-card');
+    if (card && card.dataset.userId) {
+      showHistory(parseInt(card.dataset.userId));
+    }
+  });
 
   // Toggle update bar
   const toggleBtn = document.getElementById('toggle-update');
