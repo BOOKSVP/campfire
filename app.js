@@ -111,12 +111,16 @@ async function postStatus(teamUserId, status, expiresMinutes) {
 
 // ── Settings ──
 
-function renderSettings() {
-  const container = document.getElementById('identity-options');
-  const hint = document.getElementById('settings-hint');
+window.openSettings = function openSettings() {
+  const grid = document.getElementById('team-grid');
+  const updateBar = document.getElementById('update-bar');
+  const footer = document.querySelector('footer');
+  updateBar.classList.add('hidden');
+  if (footer) footer.classList.add('hidden');
+
   const currentId = getIdentity();
 
-  container.innerHTML = currentUsers.map(u => {
+  const optionsHtml = currentUsers.map(u => {
     const selected = currentId == u.id;
     const avatarInner = u.profile_pic_url
       ? `<img src="${u.profile_pic_url}" alt="${u.username}">`
@@ -131,40 +135,39 @@ function renderSettings() {
     `;
   }).join('');
 
-  hint.textContent = currentId
+  const hint = currentId
     ? `You're posting as ${currentUsers.find(u => u.id == currentId)?.username || 'Unknown'}`
     : 'Select your name to post status updates';
 
+  grid.innerHTML = `
+    <div class="history-view">
+      <div class="history-header">
+        <button class="history-back" onclick="window.closeSettings()">← Back</button>
+        <div class="history-title">Settings</div>
+      </div>
+      <div class="settings-body">
+        <label class="settings-label">Who are you?</label>
+        <div class="identity-options">${optionsHtml}</div>
+        <p class="settings-hint">${hint}</p>
+      </div>
+    </div>
+  `;
+
   // Click handlers
-  container.querySelectorAll('.identity-option').forEach(el => {
+  grid.querySelectorAll('.identity-option').forEach(el => {
     el.addEventListener('click', () => {
       setIdentity(el.dataset.userId);
-      renderSettings();
       updatePostButton();
       toast(`You're now ${currentUsers.find(u => u.id == el.dataset.userId)?.username} 🔥`);
+      openSettings(); // Re-render to show checkmark
     });
   });
 }
 
-window.openSettings = function openSettings() {
-  const panel = document.getElementById('settings-panel');
-  const grid = document.getElementById('team-grid');
-  const updateBar = document.getElementById('update-bar');
-  const footer = document.querySelector('footer');
-  panel.classList.remove('hidden');
-  grid.classList.add('hidden');
-  updateBar.classList.add('hidden');
-  if (footer) footer.classList.add('hidden');
-  renderSettings();
-}
-
 window.closeSettings = function closeSettings() {
-  const panel = document.getElementById('settings-panel');
-  const grid = document.getElementById('team-grid');
   const footer = document.querySelector('footer');
-  panel.classList.add('hidden');
-  grid.classList.remove('hidden');
   if (footer) footer.classList.remove('hidden');
+  refresh();
 }
 
 function updatePostButton() {
