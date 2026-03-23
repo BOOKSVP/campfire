@@ -1,53 +1,54 @@
-import { MenuBarExtra, LaunchType, launchCommand, Icon, Image, showToast, Toast, LocalStorage, environment } from "@raycast/api";
+import { MenuBarExtra, LaunchType, launchCommand, Icon, Image, showToast, Toast, LocalStorage } from "@raycast/api";
 import { useCachedPromise } from "@raycast/utils";
 import { fetchUsersWithStatuses } from "./api";
 import { UserWithStatus } from "./types";
 import { timeAgo } from "./utils";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
 const LAST_SEEN_KEY = "campfire_last_seen_ts";
 
 export default function MenuBar() {
   const [hasNew, setHasNew] = useState(false);
   const [lastSeenTs, setLastSeenTs] = useState<number>(0);
-  const hasMarkedSeen = useRef(false);
+  const [loaded, setLoaded] = useState(false);
 
   const { data, isLoading, revalidate } = useCachedPromise(fetchUsersWithStatuses, [], {
     keepPreviousData: true,
   });
 
-  // Load last seen timestamp on mount
+  // Load last seen timestamp
   useEffect(() => {
     LocalStorage.getItem<string>(LAST_SEEN_KEY).then((val) => {
-      if (val) setLastSeenTs(parseInt(val, 10));
+      setLastSeenTs(val ? parseInt(val, 10) : 0);
+      setLoaded(true);
     });
   }, []);
 
-  // Check for new statuses (background refresh)
+  // Compare newest status to last seen
   useEffect(() => {
-    if (!data) return;
+    if (!data || !loaded) return;
 
     const newestTs = Math.max(
+      0,
       ...data.map((d: UserWithStatus) =>
         d.latestStatus ? new Date(d.latestStatus.created_at).getTime() : 0
       )
     );
 
-    setHasNew(lastSeenTs > 0 ? newestTs > lastSeenTs : newestTs > 0);
-  }, [data, lastSeenTs]);
+    // New if there's a status newer than what we last acknowledged
+    setHasNew(newestTs > lastSeenTs);
+  }, [data, lastSeenTs, loaded]);
 
-  // When launched by user (dropdown opened), mark as seen
-  useEffect(() => {
-    if (environment.launchType === LaunchType.UserInitiated && !hasMarkedSeen.current && data) {
-      hasMarkedSeen.current = true;
-      const now = Date.now();
-      LocalStorage.setItem(LAST_SEEN_KEY, String(now));
-      setLastSeenTs(now);
-      setHasNew(false);
-    }
-  }, [data]);
+  // Mark as seen — only called on explicit user action
+  async function markSeen() {
+    const now = Date.now();
+    await LocalStorage.setItem(LAST_SEEN_KEY, String(now));
+    setLastSeenTs(now);
+    setHasNew(false);
+  }
 
   async function openTeamStatus() {
+    await markSeen();
     try {
       await launchCommand({ name: "team-status", type: LaunchType.UserInitiated });
     } catch {
@@ -56,11 +57,17 @@ export default function MenuBar() {
   }
 
   async function openPostStatus() {
+    await markSeen();
     try {
       await launchCommand({ name: "post-status", type: LaunchType.UserInitiated });
     } catch {
       await showToast({ style: Toast.Style.Failure, title: "Could not open Post Status" });
     }
+  }
+
+  async function handleRefresh() {
+    await markSeen();
+    revalidate();
   }
 
   const menuIcon = hasNew ? "flame-color.png" : "flame-grey.png";
@@ -86,7 +93,7 @@ export default function MenuBar() {
             title={`${name}: ${statusText}`}
             subtitle={subtitle}
             icon={icon}
-            onAction={openTeamStatus}
+            onAction={() => openTeamStatus()}
           />
         );
       })}
@@ -101,10 +108,9 @@ export default function MenuBar() {
       />
 
       <MenuBarExtra.Item
-        title="Refresh"
-        icon={Icon.ArrowClockwise}
-        onAction={revalidate}
-        shortcut={{ modifiers: ["cmd"], key: "r" }}
+        title="Mark as Read"
+        icon={Icon.Checkmark}
+        onAction={handleRefresh}
       />
     </MenuBarExtra>
   );
