@@ -1,6 +1,8 @@
-import { Form, ActionPanel, Action, getPreferenceValues, showToast, Toast, popToRoot, Icon } from "@raycast/api";
+import { Form, ActionPanel, Action, getPreferenceValues, showToast, Toast, popToRoot, Icon, LocalStorage } from "@raycast/api";
 import { postStatus } from "./api";
 import { getExpiryDate } from "./utils";
+
+const LAST_SEEN_KEY = "campfire_last_seen_ts";
 
 interface Preferences {
   supabaseUrl: string;
@@ -33,6 +35,10 @@ export default function PostStatus() {
     await showToast({ style: Toast.Style.Animated, title: "Posting status..." });
 
     try {
+      // Set lastSeen to 1 second ago so menu bar detects this post as new
+      const oneSecAgo = String(Date.now() - 1000);
+      await LocalStorage.setItem(LAST_SEEN_KEY, oneSecAgo);
+
       await postStatus(userId, values.status.trim(), expiresAt);
       await showToast({ style: Toast.Style.Success, title: "Status posted! 🔥" });
       await popToRoot();
