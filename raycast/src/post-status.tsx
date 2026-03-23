@@ -1,4 +1,4 @@
-import { Form, ActionPanel, Action, getPreferenceValues, showToast, Toast, popToRoot, Icon, LocalStorage } from "@raycast/api";
+import { Form, ActionPanel, Action, getPreferenceValues, showToast, Toast, popToRoot, Icon, LocalStorage, launchCommand, LaunchType } from "@raycast/api";
 import { postStatus } from "./api";
 import { getExpiryDate } from "./utils";
 
@@ -35,12 +35,20 @@ export default function PostStatus() {
     await showToast({ style: Toast.Style.Animated, title: "Posting status..." });
 
     try {
-      // Set lastSeen to 1 second ago so menu bar detects this post as new
-      const oneSecAgo = String(Date.now() - 1000);
-      await LocalStorage.setItem(LAST_SEEN_KEY, oneSecAgo);
-
       await postStatus(userId, values.status.trim(), expiresAt);
+
+      // Set lastSeen to before the post so menu bar detects it as new
+      await LocalStorage.setItem(LAST_SEEN_KEY, String(Date.now() - 2000));
+
       await showToast({ style: Toast.Style.Success, title: "Status posted! 🔥" });
+
+      // Force menu bar to refresh and pick up the new status
+      try {
+        await launchCommand({ name: "menu-bar", type: LaunchType.Background });
+      } catch {
+        // Menu bar might not be running, that's fine
+      }
+
       await popToRoot();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
