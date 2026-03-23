@@ -259,6 +259,101 @@ footer {
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
+/* Settings Panel */
+.settings-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.settings-panel.hidden {
+  display: none;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-body {
+  padding: 16px 18px;
+}
+
+.settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.identity-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.identity-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.identity-option:hover {
+  background: var(--bg);
+}
+
+.identity-option.selected {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+}
+
+.identity-option .avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.identity-name {
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.identity-check {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.settings-hint {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.text-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
 /* History Panel */
 #history-panel {
   margin-top: 12px;

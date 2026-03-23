@@ -18,8 +18,21 @@
       <div class="loading">Loading...</div>
     </div>
 
+    <!-- Settings panel (hidden by default) -->
+    <div id="settings-panel" class="settings-panel hidden">
+      <div class="settings-header">
+        <span class="settings-title">Settings</span>
+        <button class="history-back" onclick="window.closeSettings()">✕</button>
+      </div>
+      <div class="settings-body">
+        <label class="settings-label">Who are you?</label>
+        <div id="identity-options" class="identity-options"></div>
+        <p class="settings-hint" id="settings-hint">Select your name to post status updates</p>
+      </div>
+    </div>
+
+    <!-- Update bar (locked until identity set) -->
     <div id="update-bar" class="update-bar hidden">
-      <select id="user-select"></select>
       <input type="text" id="status-input" placeholder="What are you working on?" maxlength="280">
       <select id="expires-select">
         <option value="">No expiry</option>
@@ -34,6 +47,8 @@
 
     <footer>
       <button id="toggle-update" class="text-btn">Post an update</button>
+      <span class="sep">·</span>
+      <button id="toggle-settings" class="text-btn">⚙ Settings</button>
       <span class="sep">·</span>
       <span id="last-refresh" class="meta"></span>
     </footer>

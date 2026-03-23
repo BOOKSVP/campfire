@@ -15,6 +15,20 @@ const headers = {
 
 let currentUsers = [];
 
+// ── Identity (localStorage) ──
+
+function getIdentity() {
+  return localStorage.getItem('campfire_user_id');
+}
+
+function setIdentity(userId) {
+  localStorage.setItem('campfire_user_id', userId);
+}
+
+function hasIdentity() {
+  return !!getIdentity();
+}
+
 // ── Helpers ──
 
 function timeAgo(date) {
@@ -24,20 +38,6 @@ function timeAgo(date) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function formatDate(date) {
-  const d = new Date(date);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-  const isYesterday = d.toDateString() === yesterday.toDateString();
-
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  if (isToday) return `Today ${time}`;
-  if (isYesterday) return `Yesterday ${time}`;
-  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`;
 }
 
 function getInitials(name) {
@@ -73,8 +73,6 @@ async function fetchLatestStatuses() {
     { headers }
   );
   const all = await res.json();
-
-  // Group by user, take latest
   const latest = {};
   for (const s of all) {
     if (!latest[s.team_user_id]) {
@@ -110,6 +108,72 @@ async function postStatus(teamUserId, status, expiresMinutes) {
   return res.ok;
 }
 
+// ── Settings ──
+
+function renderSettings() {
+  const container = document.getElementById('identity-options');
+  const hint = document.getElementById('settings-hint');
+  const currentId = getIdentity();
+
+  container.innerHTML = currentUsers.map(u => {
+    const selected = currentId == u.id;
+    const avatarInner = u.profile_pic_url
+      ? `<img src="${u.profile_pic_url}" alt="${u.username}">`
+      : getInitials(u.username);
+
+    return `
+      <div class="identity-option ${selected ? 'selected' : ''}" data-user-id="${u.id}">
+        <div class="avatar">${avatarInner}</div>
+        <span class="identity-name">${u.username}</span>
+        ${selected ? '<span class="identity-check">✓</span>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  hint.textContent = currentId
+    ? `You're posting as ${currentUsers.find(u => u.id == currentId)?.username || 'Unknown'}`
+    : 'Select your name to post status updates';
+
+  // Click handlers
+  container.querySelectorAll('.identity-option').forEach(el => {
+    el.addEventListener('click', () => {
+      setIdentity(el.dataset.userId);
+      renderSettings();
+      updatePostButton();
+      toast(`You're now ${currentUsers.find(u => u.id == el.dataset.userId)?.username} 🔥`);
+    });
+  });
+}
+
+window.openSettings = function openSettings() {
+  const panel = document.getElementById('settings-panel');
+  const grid = document.getElementById('team-grid');
+  const updateBar = document.getElementById('update-bar');
+  panel.classList.remove('hidden');
+  grid.classList.add('hidden');
+  updateBar.classList.add('hidden');
+  renderSettings();
+}
+
+window.closeSettings = function closeSettings() {
+  const panel = document.getElementById('settings-panel');
+  const grid = document.getElementById('team-grid');
+  panel.classList.add('hidden');
+  grid.classList.remove('hidden');
+}
+
+function updatePostButton() {
+  const toggleBtn = document.getElementById('toggle-update');
+  if (hasIdentity()) {
+    const user = currentUsers.find(u => u.id == getIdentity());
+    toggleBtn.textContent = `Post as ${user?.username || '...'}`;
+    toggleBtn.disabled = false;
+  } else {
+    toggleBtn.textContent = 'Set up your identity first';
+    toggleBtn.disabled = true;
+  }
+}
+
 // ── History Panel ──
 
 window.showHistory = async function showHistory(userId) {
@@ -123,7 +187,6 @@ window.showHistory = async function showHistory(userId) {
     ? `<img src="${user.profile_pic_url}" alt="${user.username}">`
     : getInitials(user.username);
 
-  // Group by day
   let historyHtml = '';
   if (!history.length) {
     historyHtml = '<div class="history-empty">No status history yet</div>';
@@ -161,7 +224,6 @@ window.showHistory = async function showHistory(userId) {
     }
   }
 
-  // Replace the grid with the history view
   grid.innerHTML = `
     <div class="history-view">
       <div class="history-header">
@@ -185,7 +247,6 @@ window.closeHistory = function closeHistory() {
 
 function renderTeam(users, statuses) {
   const grid = document.getElementById('team-grid');
-  const select = document.getElementById('user-select');
   currentUsers = users;
 
   if (!users.length) {
@@ -221,10 +282,7 @@ function renderTeam(users, statuses) {
     `;
   }).join('');
 
-  // Populate user dropdown
-  select.innerHTML = users.map(u =>
-    `<option value="${u.id}">${u.username}</option>`
-  ).join('');
+  updatePostButton();
 }
 
 // ── Init ──
@@ -265,18 +323,37 @@ function init() {
   const toggleBtn = document.getElementById('toggle-update');
   const updateBar = document.getElementById('update-bar');
   toggleBtn.addEventListener('click', () => {
+    if (!hasIdentity()) {
+      openSettings();
+      return;
+    }
     updateBar.classList.toggle('hidden');
     if (!updateBar.classList.contains('hidden')) {
       document.getElementById('status-input').focus();
     }
   });
 
-  // Post status
+  // Settings toggle
+  document.getElementById('toggle-settings').addEventListener('click', () => {
+    const panel = document.getElementById('settings-panel');
+    if (panel.classList.contains('hidden')) {
+      openSettings();
+    } else {
+      closeSettings();
+    }
+  });
+
+  // Post status (as current identity only)
   const postBtn = document.getElementById('post-btn');
   const statusInput = document.getElementById('status-input');
 
   async function doPost() {
-    const userId = parseInt(document.getElementById('user-select').value);
+    if (!hasIdentity()) {
+      toast('Set your identity in Settings first');
+      return;
+    }
+
+    const userId = parseInt(getIdentity());
     const status = statusInput.value.trim();
     const expires = document.getElementById('expires-select').value;
 
@@ -300,6 +377,11 @@ function init() {
   statusInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doPost();
   });
+
+  // If no identity set, prompt on first visit
+  if (!hasIdentity()) {
+    setTimeout(() => openSettings(), 500);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
