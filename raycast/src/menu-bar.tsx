@@ -1,45 +1,49 @@
 import { MenuBarExtra, LaunchType, launchCommand, Icon, Image, showToast, Toast, LocalStorage } from "@raycast/api";
-import { useCachedPromise } from "@raycast/utils";
 import { fetchUsersWithStatuses } from "./api";
 import { UserWithStatus } from "./types";
 import { timeAgo } from "./utils";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 const LAST_SEEN_KEY = "campfire_last_seen_ts";
+const POLL_INTERVAL = 10000; // 10 seconds
 
 export default function MenuBar() {
   const [hasNew, setHasNew] = useState(false);
   const [lastSeenTs, setLastSeenTs] = useState<number>(0);
-  const [loaded, setLoaded] = useState(false);
+  const [data, setData] = useState<UserWithStatus[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data, isLoading, revalidate } = useCachedPromise(fetchUsersWithStatuses, [], {
-    keepPreviousData: true,
-  });
+  const fetchData = useCallback(async () => {
+    try {
+      const result = await fetchUsersWithStatuses();
+      setData(result);
+      setIsLoading(false);
 
-  // Load last seen timestamp
-  useEffect(() => {
-    LocalStorage.getItem<string>(LAST_SEEN_KEY).then((val) => {
-      setLastSeenTs(val ? parseInt(val, 10) : 0);
-      setLoaded(true);
-    });
+      // Check last seen from storage (might have been updated by Post Status)
+      const stored = await LocalStorage.getItem<string>(LAST_SEEN_KEY);
+      const seenTs = stored ? parseInt(stored, 10) : 0;
+      setLastSeenTs(seenTs);
+
+      const newestTs = Math.max(
+        0,
+        ...result.map((d: UserWithStatus) =>
+          d.latestStatus ? new Date(d.latestStatus.created_at).getTime() : 0
+        )
+      );
+
+      setHasNew(newestTs > seenTs);
+    } catch (e) {
+      console.error("Fetch failed:", e);
+    }
   }, []);
 
-  // Compare newest status to last seen
+  // Initial fetch + polling every 10s
   useEffect(() => {
-    if (!data || !loaded) return;
+    fetchData();
+    const interval = setInterval(fetchData, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
-    const newestTs = Math.max(
-      0,
-      ...data.map((d: UserWithStatus) =>
-        d.latestStatus ? new Date(d.latestStatus.created_at).getTime() : 0
-      )
-    );
-
-    // New if there's a status newer than what we last acknowledged
-    setHasNew(newestTs > lastSeenTs);
-  }, [data, lastSeenTs, loaded]);
-
-  // Mark as seen — only called on explicit user action
   async function markSeen() {
     const now = Date.now();
     await LocalStorage.setItem(LAST_SEEN_KEY, String(now));
@@ -57,17 +61,11 @@ export default function MenuBar() {
   }
 
   async function openPostStatus() {
-    await markSeen();
     try {
       await launchCommand({ name: "post-status", type: LaunchType.UserInitiated });
     } catch {
       await showToast({ style: Toast.Style.Failure, title: "Could not open Post Status" });
     }
-  }
-
-  async function handleRefresh() {
-    await markSeen();
-    revalidate();
   }
 
   const menuIcon = hasNew ? "flame-color.png" : "flame-grey.png";
@@ -110,7 +108,7 @@ export default function MenuBar() {
       <MenuBarExtra.Item
         title="Mark as Read"
         icon={Icon.Checkmark}
-        onAction={handleRefresh}
+        onAction={markSeen}
       />
     </MenuBarExtra>
   );
