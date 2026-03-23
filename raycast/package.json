@@ -27,7 +27,7 @@
       "title": "Campfire",
       "description": "Team status in menu bar",
       "mode": "menu-bar",
-      "interval": "30m"
+      "interval": "10s"
     }
   ],
   "preferences": [
