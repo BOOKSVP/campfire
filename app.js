@@ -343,12 +343,7 @@ function init() {
 
   // Settings toggle
   document.getElementById('toggle-settings').addEventListener('click', () => {
-    const panel = document.getElementById('settings-panel');
-    if (panel.classList.contains('hidden')) {
-      openSettings();
-    } else {
-      closeSettings();
-    }
+    openSettings();
   });
 
   // Post status (as current identity only)
