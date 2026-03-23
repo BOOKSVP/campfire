@@ -418,16 +418,13 @@ function setupRealtime() {
         // Refresh the UI instantly
         refresh();
 
-        // Send browser notification
-        const myId = getIdentity();
+        // Send browser notification for all posts
         if ('Notification' in window && Notification.permission === 'granted') {
-          if (String(userId) !== String(myId)) {
-            new Notification(`🔥 ${name}`, {
-              body: status,
-              icon: user?.profile_pic_url || undefined,
-              tag: `campfire-${userId}`
-            });
-          }
+          new Notification(`🔥 ${name}`, {
+            body: status,
+            icon: user?.profile_pic_url || undefined,
+            tag: `campfire-${userId}`
+          });
         }
       }
     )
