@@ -13,6 +13,8 @@ const headers = {
   'Prefer': 'return=representation'
 };
 
+let currentUsers = [];
+
 // ── Helpers ──
 
 function timeAgo(date) {
@@ -22,6 +24,20 @@ function timeAgo(date) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function formatDate(date) {
+  const d = new Date(date);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) return `Today ${time}`;
+  if (isYesterday) return `Yesterday ${time}`;
+  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`;
 }
 
 function getInitials(name) {
@@ -52,7 +68,6 @@ async function fetchUsers() {
 }
 
 async function fetchLatestStatuses() {
-  // Get the most recent status for each user via a view or by fetching all recent
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/status_updates?team_id=eq.${TEAM_ID}&order=created_at.desc&limit=100`,
     { headers }
@@ -67,6 +82,14 @@ async function fetchLatestStatuses() {
     }
   }
   return latest;
+}
+
+async function fetchUserHistory(teamUserId) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/status_updates?team_user_id=eq.${teamUserId}&order=created_at.desc&limit=30`,
+    { headers }
+  );
+  return res.json();
 }
 
 async function postStatus(teamUserId, status, expiresMinutes) {
@@ -87,11 +110,95 @@ async function postStatus(teamUserId, status, expiresMinutes) {
   return res.ok;
 }
 
+// ── History Panel ──
+
+async function showHistory(userId) {
+  const user = currentUsers.find(u => u.id === userId);
+  if (!user) return;
+
+  // Close if already open for this user
+  const existing = document.getElementById('history-panel');
+  if (existing && existing.dataset.userId == userId) {
+    existing.remove();
+    return;
+  }
+  if (existing) existing.remove();
+
+  const history = await fetchUserHistory(userId);
+
+  const panel = document.createElement('div');
+  panel.id = 'history-panel';
+  panel.dataset.userId = userId;
+
+  const avatarInner = user.profile_pic_url
+    ? `<img src="${user.profile_pic_url}" alt="${user.username}">`
+    : getInitials(user.username);
+
+  if (!history.length) {
+    panel.innerHTML = `
+      <div class="history-header">
+        <div class="history-avatar avatar">${avatarInner}</div>
+        <div class="history-title">${user.username}</div>
+        <button class="history-close" onclick="this.closest('#history-panel').remove()">✕</button>
+      </div>
+      <div class="history-empty">No status history yet</div>
+    `;
+  } else {
+    // Group by day
+    const days = {};
+    for (const s of history) {
+      const dayKey = new Date(s.created_at).toDateString();
+      if (!days[dayKey]) days[dayKey] = [];
+      days[dayKey].push(s);
+    }
+
+    let historyHtml = '';
+    for (const [dayKey, entries] of Object.entries(days)) {
+      const d = new Date(dayKey);
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+      const isYesterday = d.toDateString() === yesterday.toDateString();
+      const dayLabel = isToday ? 'Today' : isYesterday ? 'Yesterday'
+        : d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+
+      historyHtml += `<div class="history-day-label">${dayLabel}</div>`;
+      for (const s of entries) {
+        const time = new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const expired = isExpired(s.expires_at);
+        const expiryTag = s.expires_at
+          ? (expired ? ' <span class="history-expired">expired</span>' : ` <span class="history-expiry">til ${new Date(s.expires_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>`)
+          : '';
+        historyHtml += `
+          <div class="history-entry ${expired ? 'dimmed' : ''}">
+            <span class="history-time">${time}</span>
+            <span class="history-status">${s.status}${expiryTag}</span>
+          </div>
+        `;
+      }
+    }
+
+    panel.innerHTML = `
+      <div class="history-header">
+        <div class="history-avatar avatar">${avatarInner}</div>
+        <div class="history-title">${user.username}</div>
+        <button class="history-close" onclick="this.closest('#history-panel').remove()">✕</button>
+      </div>
+      <div class="history-list">${historyHtml}</div>
+    `;
+  }
+
+  // Insert after the team grid
+  const grid = document.getElementById('team-grid');
+  grid.after(panel);
+}
+
 // ── Render ──
 
 function renderTeam(users, statuses) {
   const grid = document.getElementById('team-grid');
   const select = document.getElementById('user-select');
+  currentUsers = users;
 
   if (!users.length) {
     grid.innerHTML = '<div class="loading">No team members yet</div>';
@@ -112,7 +219,7 @@ function renderTeam(users, statuses) {
       : getInitials(u.username);
 
     return `
-      <div class="user-card">
+      <div class="user-card" onclick="showHistory(${u.id})" style="cursor:pointer">
         <div class="avatar">${avatarInner}</div>
         <div class="user-info">
           <div class="user-name">${u.username}</div>
