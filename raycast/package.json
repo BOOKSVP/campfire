@@ -18,7 +18,9 @@
       "name": "post-status",
       "title": "Post Status",
       "description": "Post a status update",
-      "mode": "view"
+      "mode": "view",
+      "keywords": ["campfire", "status", "update"],
+      "hotkey": { "modifiers": ["cmd"], "key": "\\" }
     },
     {
       "name": "menu-bar",
@@ -48,8 +50,8 @@
       "name": "yourName",
       "title": "Your Name",
       "type": "dropdown",
-      "required": false,
-      "description": "Your team member name (auto-selects when posting)",
+      "required": true,
+      "description": "Select who you are — you can only post statuses as yourself",
       "data": [
         { "title": "Max", "value": "1" },
         { "title": "Mike", "value": "2" },

@@ -12,8 +12,8 @@ type ExtensionPreferences = {
   "supabaseUrl": string,
   /** Supabase API Key - Your Supabase publishable API key */
   "supabaseKey": string,
-  /** Your Name - Your team member name (auto-selects when posting) */
-  "yourName"?: "1" | "2" | "3" | "4" | "6"
+  /** Your Name - Select who you are — you can only post statuses as yourself */
+  "yourName": "1" | "2" | "3" | "4" | "6"
 }
 
 /** Preferences accessible in all the extension's commands */

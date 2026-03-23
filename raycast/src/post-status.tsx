@@ -1,9 +1,6 @@
-import { Form, ActionPanel, Action, getPreferenceValues, showToast, Toast, popToRoot, Image, Icon } from "@raycast/api";
-import { useCachedPromise } from "@raycast/utils";
-import { fetchTeamUsers } from "./api";
+import { Form, ActionPanel, Action, getPreferenceValues, showToast, Toast, popToRoot, Icon } from "@raycast/api";
 import { postStatus } from "./api";
 import { getExpiryDate } from "./utils";
-import { TeamUser } from "./types";
 
 interface Preferences {
   supabaseUrl: string;
@@ -12,18 +9,13 @@ interface Preferences {
 }
 
 interface FormValues {
-  userId: string;
   status: string;
   expiry: string;
 }
 
 export default function PostStatus() {
   const prefs = getPreferenceValues<Preferences>();
-  const defaultUserId = prefs.yourName ?? "";
-
-  const { data: users, isLoading } = useCachedPromise(fetchTeamUsers, [], {
-    keepPreviousData: true,
-  });
+  const userId = parseInt(prefs.yourName, 10);
 
   async function handleSubmit(values: FormValues) {
     if (!values.status.trim()) {
@@ -31,9 +23,8 @@ export default function PostStatus() {
       return;
     }
 
-    const userId = parseInt(values.userId, 10);
     if (isNaN(userId)) {
-      await showToast({ style: Toast.Style.Failure, title: "Please select a team member" });
+      await showToast({ style: Toast.Style.Failure, title: "Set your name in extension preferences first" });
       return;
     }
 
@@ -43,7 +34,7 @@ export default function PostStatus() {
 
     try {
       await postStatus(userId, values.status.trim(), expiresAt);
-      await showToast({ style: Toast.Style.Success, title: "Status posted!" });
+      await showToast({ style: Toast.Style.Success, title: "Status posted! 🔥" });
       await popToRoot();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -53,28 +44,18 @@ export default function PostStatus() {
 
   return (
     <Form
-      isLoading={isLoading}
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Post Status" icon={Icon.Pencil} onSubmit={handleSubmit} />
         </ActionPanel>
       }
     >
-      <Form.Dropdown id="userId" title="Team Member" defaultValue={defaultUserId}>
-        {(users ?? []).map((user: TeamUser) => {
-          const name = user.username;
-          const icon: Image.ImageLike = user.profile_pic_url
-            ? { source: user.profile_pic_url, mask: Image.Mask.Circle }
-            : Icon.Person;
-          return <Form.Dropdown.Item key={user.id} value={String(user.id)} title={name} icon={icon} />;
-        })}
-      </Form.Dropdown>
-
       <Form.TextArea
         id="status"
         title="Status"
-        placeholder="What are you up to?"
+        placeholder="What are you working on?"
         info="Max 280 characters"
+        autoFocus
       />
 
       <Form.Dropdown id="expiry" title="Expires" defaultValue="none">
