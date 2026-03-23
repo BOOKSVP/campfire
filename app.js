@@ -112,7 +112,7 @@ async function postStatus(teamUserId, status, expiresMinutes) {
 
 // ── History Panel ──
 
-async function showHistory(userId) {
+window.showHistory = async function showHistory(userId) {
   const user = currentUsers.find(u => u.id === userId);
   if (!user) return;
 
