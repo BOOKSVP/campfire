@@ -2,8 +2,8 @@
 
 The proposed evolution of Campfire: a Mac app for asynchronous teams — one glance to see what everyone's doing, one keystroke to say what you're doing.
 
-- **[PITCH.md](./PITCH.md)** — the concept: what Dailies is, why it's worth building, what we learned from Campfire, the feature map, and what it deliberately is not.
-- **[TECH.md](./TECH.md)** — the build plan: the "fastest, most lightweight API" experiment and its results, the API contract, the Mac app architecture, and the four-phase roadmap.
+- **[PITCH.md](./PITCH.md)** — the investor pitch: the problem, the single-entry concept (you post entries; AI infers your status and writes the end-of-day summaries), where the product stands today, and the horizon.
+- **[TECH.md](./TECH.md)** — the build plan: the "fastest, most lightweight API" experiment and its results, the API contract, the single-entry intelligence layer, the Mac app architecture, and the roadmap.
 - **[api/](./api/)** — the experiment itself: a working, zero-dependency Dailies API in a single file.
 
 ## Run the experiment

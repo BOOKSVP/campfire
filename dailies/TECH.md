@@ -24,7 +24,7 @@ Everything v1 needs, nothing else:
 
 - **Email OTP auth** — request a 6-digit code, verify it, get a bearer token. With `RESEND_API_KEY` set, codes go out via Resend (one HTTPS call, no SMTP); without it, dev mode returns the code inline so local development needs zero setup. Codes expire in 10 minutes, burn after use, and lock after 5 wrong attempts.
 - **Teams** — create one (you become admin), get a speakable invite code (`ember-x7k2q`), join by code, list your teams. Membership checks on every team route.
-- **Entries** — one table, two kinds. `kind: "status"` (≤280 chars, optional expiry — Campfire's model, kept intact) and `kind: "daily"` (long-form, accumulates). One concept in the schema, two behaviors in the product.
+- **Entries** — one table, two kinds. `kind: "status"` (≤280 chars, optional expiry — Campfire's model, kept intact) and `kind: "daily"` (long-form, accumulates). One concept in the schema, two behaviors in the product. *(Since superseded at the capture layer — see §4: the client no longer asks the user to choose a kind; a classifier assigns it. The schema is unchanged.)*
 - **The reads the apps actually need** — `GET /teams/:id/today` (full roster + live statuses + today's dailies: the Mac app home screen in a single call), filterable `GET /teams/:id/entries` (per-person history, feeds), and `GET /teams/:id/digest?date=` (a day's dailies grouped by person: the morning reel).
 
 ### Measured results (this container, no tuning)
@@ -84,7 +84,7 @@ Also not in the prototype but required before public exposure: rate limiting on 
 
 1. **Menu bar item** — the 🔥. Subtle badge when there are unread dailies since your last glance.
 2. **Roster popover** (click the flame) — the Campfire board, native: avatar, name, live status with time-ago, today's daily beneath. Click a person → their history grouped by day. Poll `/today` every 30s while open; refresh on wake-from-sleep.
-3. **Capture panel** (global hotkey, default ⌘⇧D — configurable) — a floating `NSPanel` like Spotlight: text field, a status/daily segmented toggle, expiry presets on status mode (30m / 1h / 2h / 4h / end of day — Campfire's exact set, they were right). Enter posts, Escape dismisses, panel appears over any app, including full-screen ones.
+3. **Capture panel** (global hotkey, default ⌘⇧D — configurable) — a floating `NSPanel` like Spotlight: one text field, nothing else. No kind toggle, no expiry picker — classification is the server’s job (§4). Enter posts, Escape dismisses, panel appears over any app, including full-screen ones.
 4. **Onboarding window** (first run only) — email → code → create-or-join team. Three screens, no account settings, done.
 5. **Reminder engine** — a local `UNUserNotificationCenter` notification at the user's chosen hour if today's daily is unwritten (the app knows from `/today`). Local-first reminders mean v1 ships **zero** push-notification infrastructure: no APNs certificates, no device-token tables, no server scheduler. Server-side push (for "Grace posted" notifications when the app is closed) is Phase 3, and the entries table already contains everything it needs.
 6. **Offline capture** — if a post fails, queue it locally and retry; capture must never lose words. (The one place the client is allowed to be clever.)
@@ -105,13 +105,31 @@ Also not in the prototype but required before public exposure: rate limiting on 
 
 ---
 
-## 4. Roadmap
+## 4. The single-entry model and the intelligence layer
+
+The concept evolved after the prototype landed (see the pitch): the user never chooses between "status" and "daily" at capture. There is **one entry type**. You say what's happening; the server works out what it means. This is an API-layer change — the schema and 90% of the prototype survive untouched.
+
+### What changes in the API
+
+- `POST /teams/:id/entries` takes just `{body}`. The `kind` and `expires_at` columns remain in the schema but are now **written by the classifier**, not the client. (A client override stays possible but no UI exposes it.)
+- On each post, a small classification pass — one LLM call with a strict JSON output — answers two questions: *is this something the author is doing right now?* (→ set it as the live status, with an inferred expiry: "in a meeting til 3" → 3pm; "deep work" → a default block) and *does it supersede or merely annotate the previous entry?* Classification is fast, cheap (a few hundred tokens), and fails safe: if the call errors, the entry is stored as plain log — capture never blocks on AI.
+- **End-of-day summaries.** A scheduled pass per user per day (run at each user's local day-close, so one cron sweep per hour over `settings.timezone`) reads the day's entries and writes a short personal summary; a second pass composes the team summary from the personal ones. Both are stored in a new `summaries` table (`team_id, user_id NULLABLE, date, body`) — `user_id NULL` = the team-level summary. Summaries are cached, regenerated only if entries arrive after the fact.
+- **Per-user settings**, the small table the pitch's "you choose when" promises: `reminder_time` (nullable — null means never nudge), `digest_time`, `digest_channel` (app / email), `timezone`. Exposed as `GET/PATCH /me/settings`.
+- New reads: `GET /teams/:id/summary?date=` (team summary + per-person summaries — replaces `digest` as the reel) and `GET /me/summary?date=`.
+
+### Cost and failure posture
+
+The AI surface is deliberately the boring kind: short factual first-person text in, short factual text out. Per team per day: ~a dozen classification calls plus N+1 summary calls over a few kilobytes of text — pennies. Every AI feature degrades gracefully to the non-AI product: no classifier → entries are still stored and shown chronologically; no summarizer → the reel falls back to raw entries grouped by person (which is exactly what `digest` already returns). The AI is a librarian over the user's words, never an author — it must not put words in anyone's mouth, and summary prompts constrain it to reference only what was written.
+
+---
+
+## 5. Roadmap
 
 **Phase 1 — Foundation (weeks 1–2).** Harden the prototype (rate limiting, logging, Resend wired, Litestream) and deploy. Re-point the Raycast extension at it. ARTSVP migrates off the anon-key Supabase board; seed script carries history over. *Exit: the team lives on real auth without noticing the switch.*
 
 **Phase 2 — The Mac app (weeks 3–6).** SwiftUI app: onboarding, roster, capture panel, local reminders, offline queue. Signed, notarized, Sparkle. *Exit: everyone at ARTSVP posts a daily via the hotkey most days — the streak data will say so.*
 
-**Phase 3 — The reel & the loop (weeks 7–9).** Morning digest (in-app + email), Slack webhook, streaks, blocker flags, SSE realtime, server push for closed-app notifications. *Exit: dailies are read, not just written — digest opens say so.*
+**Phase 3 — The intelligence & the loop (weeks 7–9).** The §4 layer: entry classification, end-of-day personal and team summaries on each reader's chosen schedule (in-app + email), Slack webhook, streaks, blocker flags, SSE realtime, server push for closed-app notifications. *Exit: summaries are read, not just written — digest opens say so.*
 
 **Phase 4 — Second team & polish (weeks 10–12).** Invite a friendly outside team. Web read-only digest links. CLI. Weekly LLM summaries — the feature that turns a habit log into a leadership tool, and the natural top of the paid tier. *Exit: a team you don't have dinner with uses it unprompted for two consecutive weeks.*
 
